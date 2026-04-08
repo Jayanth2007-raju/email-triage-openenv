@@ -1,0 +1,60 @@
+name: email-triage-openenv
+version: "1.0.0"
+description: >
+  An AI agent environment for triaging a realistic inbox.
+  The agent must classify emails (urgent, reply, follow_up, spam, archive)
+  and draft replies for time-sensitive emails.
+tags:
+  - openenv
+  - email
+  - nlp
+  - triage
+  - productivity
+
+action_space:
+  type: structured
+  fields:
+    - name: email_id
+      type: integer
+      description: ID of the email to act on
+    - name: label
+      type: enum
+      values: [urgent, reply, follow_up, spam, archive]
+    - name: reply
+      type: string
+      optional: true
+      description: Draft reply text (required for urgent/reply labels in hard task)
+
+observation_space:
+  type: structured
+  fields:
+    - name: emails
+      type: list[dict]
+      description: List of emails with id, from, subject, body
+    - name: step_number
+      type: integer
+    - name: task_hint
+      type: string
+
+tasks:
+  - name: easy
+    difficulty: easy
+    description: Label 3 clearly distinct emails (spam, urgent, archive)
+    max_steps: 3
+    reward_range: [0.0, 1.0]
+  - name: medium
+    difficulty: medium
+    description: Label 5 emails including ambiguous categories
+    max_steps: 5
+    reward_range: [0.0, 1.0]
+  - name: hard
+    difficulty: hard
+    description: Label 8 emails AND draft replies for urgent/reply emails
+    max_steps: 8
+    reward_range: [0.0, 1.0]
+
+reward:
+  type: dense
+  description: >
+    Per-step reward based on label correctness (0, 0.5 for near-miss, 1.0 for correct).
+    In the hard task, reply quality contributes 40% of the score for urgent/reply emails.
