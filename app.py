@@ -12,7 +12,7 @@ from env import EmailTriageEnv, Action, Label
 
 app = FastAPI(title="Email Triage OpenEnv", version="1.0.0")
 
-# One environment instance per task (simple stateful server)
+# One environment instance per task
 _envs: dict[str, EmailTriageEnv] = {}
 
 
@@ -22,44 +22,52 @@ def _get_env(task: str) -> EmailTriageEnv:
     return _envs[task]
 
 
-class ResetRequest(BaseModel):
-    task: str = "medium"
-
-class StepRequest(BaseModel):
-    task:     str = "medium"
-    email_id: int
-    label:    str
-    reply:    Optional[str] = None
-
-
+# ✅ HEALTH
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
+# ✅ RESET (IMPORTANT FIX)
 @app.post("/reset")
-def reset(req: ResetRequest):
-    env = _get_env(req.task)
+def reset(req: dict = {}):
+    task = req.get("task", "medium")
+    env = _get_env(task)
     obs = env.reset()
     return obs.model_dump()
+
+
+# ✅ STEP
+class StepRequest(BaseModel):
+    task: str = "medium"
+    email_id: int
+    label: str
+    reply: Optional[str] = None
 
 
 @app.post("/step")
 def step(req: StepRequest):
     env = _get_env(req.task)
     try:
-        action = Action(email_id=req.email_id, label=Label(req.label), reply=req.reply)
+        action = Action(
+            email_id=req.email_id,
+            label=Label(req.label),
+            reply=req.reply
+        )
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
+
     obs, reward, done, info = env.step(action)
+
     return {
         "observation": obs.model_dump(),
-        "reward":      reward.model_dump(),
-        "done":        done,
-        "info":        info,
+        "reward": reward.model_dump(),
+        "done": done,
+        "info": info,
     }
 
 
+# ✅ STATE
 @app.get("/state")
 def state(task: str = "medium"):
     env = _get_env(task)
