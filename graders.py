@@ -1,12 +1,20 @@
 from env import EmailTriageEnv, Action
 
 
-def normalize_score(score: float) -> float:
-    """Ensure score is strictly between (0,1)"""
+def safe_score(total: float, n: int) -> float:
+    """
+    Ensure score is strictly between (0,1)
+    """
+    if n == 0:
+        return 0.5  # safe default
+
+    score = round(total / n, 4)
+
     if score <= 0.0:
         return 0.01
     elif score >= 1.0:
         return 0.99
+
     return score
 
 
@@ -23,8 +31,7 @@ def grade_easy(actions: list[dict]) -> float:
         if done:
             break
 
-    score = round(total / n, 4) if n else 0.0
-    return normalize_score(score)
+    return safe_score(total, n)
 
 
 def grade_medium(actions: list[dict]) -> float:
@@ -40,8 +47,7 @@ def grade_medium(actions: list[dict]) -> float:
         if done:
             break
 
-    score = round(total / n, 4) if n else 0.0
-    return normalize_score(score)
+    return safe_score(total, n)
 
 
 def grade_hard(actions: list[dict]) -> float:
@@ -57,8 +63,7 @@ def grade_hard(actions: list[dict]) -> float:
         if done:
             break
 
-    score = round(total / n, 4) if n else 0.0
-    return normalize_score(score)
+    return safe_score(total, n)
 
 
 GRADERS = {
