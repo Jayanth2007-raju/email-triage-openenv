@@ -1,18 +1,51 @@
 import os
-from openai import OpenAI
-from app import app  # your env server (not used directly)
+import json
 import requests
+from openai import OpenAI
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+# MUST use these (validator requirement)
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.environ["MODEL_NAME"]
 
-BASE_URL = "https://22jayanth-email-triage-openenv.hf.space"  # your HF space
+BASE_URL = "https://22jayanth-email-triage-openenv.hf.space"
 
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=HF_TOKEN,
+    api_key=API_KEY,
 )
+
+
+def get_action_from_llm(email, task):
+    prompt = f"""
+You are an email assistant.
+
+Task: {task}
+
+Email:
+Subject: {email['subject']}
+Body: {email['body']}
+
+Choose label from: urgent, spam, archive, follow_up, reply.
+
+Respond ONLY in JSON:
+{{"label": "...", "reply": "..."}}
+"""
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+
+    text = response.choices[0].message.content
+
+    try:
+        data = json.loads(text)
+    except:
+        data = {"label": "archive", "reply": ""}
+
+    return data
 
 
 def run_task(task_name):
@@ -31,11 +64,14 @@ def run_task(task_name):
 
         email = emails[0]
 
+        # ✅ LLM CALL (IMPORTANT FIX)
+        llm_output = get_action_from_llm(email, task_name)
+
         action = {
             "task": task_name,
             "email_id": email["id"],
-            "label": "archive",
-            "reply": None
+            "label": llm_output.get("label", "archive"),
+            "reply": llm_output.get("reply")
         }
 
         res = requests.post(f"{BASE_URL}/step", json=action).json()
@@ -58,6 +94,7 @@ def run_task(task_name):
 
     score = sum(rewards) / len(rewards) if rewards else 0.5
 
+    # keep score strictly between (0,1)
     if score <= 0.0:
         score = 0.01
     elif score >= 1.0:
